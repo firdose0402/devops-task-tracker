@@ -1,31 +1,40 @@
-# --- Stage 1: Build Stage ---
-FROM python:3.11-alpine AS builder
+# ── Build stage ──────────────────────────────────────────────────────────────
+FROM python:3.12-slim AS builder
 
 WORKDIR /app
-
-# Install necessary system dependencies for compiling SQLite and Python packages
-RUN apk add --no-cache gcc musl-dev python3-dev libffi-dev
-
 COPY requirements.txt .
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
-# Build Python wheels to avoid needing compilers in the final runtime stage
-RUN pip install --no-cache-dir --user -r requirements.txt
+# ── Runtime stage ─────────────────────────────────────────────────────────────
+FROM python:3.12-slim
 
-
-# --- Stage 2: Final Runtime Stage ---
-FROM python:3.11-alpine
+LABEL maintainer="devops-task-tracker"
+LABEL version="1.0.0"
 
 WORKDIR /app
 
-# Copy only the installed Python packages from the builder stage
-COPY --from=builder /root/.local /root/.local
+# Copy installed packages from builder
+COPY --from=builder /install /usr/local
+
+# Copy source
 COPY . .
 
-# Configure environment variables
-ENV PATH=/root/.local/bin:$PATH
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+# Create non-root user
+RUN adduser --disabled-password --gecos '' appuser \
+    && mkdir -p /app/instance \
+    && chown -R appuser:appuser /app
+
+USER appuser
+
+# Environment defaults
+ENV FLASK_APP=app.py \
+    FLASK_ENV=production \
+    FLASK_DEBUG=false \
+    PORT=5000
 
 EXPOSE 5000
 
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:app"]
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000/login')" || exit 1
+
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "60", "--access-logfile", "-", "app:app"]
