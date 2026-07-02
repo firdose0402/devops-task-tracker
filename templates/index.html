@@ -54,7 +54,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="modalTitle">Create Task</h5>
-                    <button type="button" class="btn-close" data-bs-disconnect="modal" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <form id="taskForm">
@@ -141,7 +141,7 @@
                                 <p class="card-text"><small class="text-muted">📅 Due: ${t.due_date || 'N/A'}</small></p>
                                 <hr>
                                 <div class="d-flex justify-content-between">
-                                    <button class="btn btn-sm btn-outline-secondary" onclick="openEditModal(${JSON.stringify(t).replace(/"/g, '&quot;')})">✏️ Edit</button>
+                                    <button class="btn btn-sm btn-outline-secondary" onclick="openEditModal(${JSON.stringify(t).replace(/\"/g, '&quot;')})">✏️ Edit</button>
                                     <button class="btn btn-sm btn-danger" onclick="deleteTask(${t.id})">🗑️ Delete</button>
                                 </div>
                             </div>
@@ -184,13 +184,16 @@
 
             const res = await fetch(url, {
                 method: method,
-                headers: { 'Content-Type': 'application/center' || 'application/json' },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
 
             if (res.ok) {
                 taskModal.hide();
                 fetchTasks();
+            } else {
+                const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+                alert(err.error || 'Failed to save task');
             }
         };
 
